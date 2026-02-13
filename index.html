@@ -1,0 +1,241 @@
+﻿<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>護理師晉升冒險地圖 🍃</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@500;700;900&display=swap');
+        :root { --morandi-pink: #F4C2C2; --mint-green: #98FF98; --ac-brown: #8B5E3C; --ac-bg: #fdf6e3; }
+        body { font-family: 'Noto Sans TC', sans-serif; background-color: var(--ac-bg); color: var(--ac-brown); min-height: 100vh; overflow-x: hidden; background-image: radial-gradient(#e5d9b6 1px, transparent 1px); background-size: 20px 20px; }
+        .ac-card { background: white; border-radius: 40px; border: 4px solid #f0e6cc; box-shadow: 0 8px 0 #e5d9b6; }
+        .tab-btn { transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275); border-radius: 25px; border: 3px solid #f0e6cc; background: white; font-weight: 900; color: #9ca3af; }
+        .tab-btn.active { background-color: var(--morandi-pink) !important; color: white !important; border-color: #e8a5a5; transform: translateY(-4px); box-shadow: 0 6px 0 #d69595; }
+        .goal-item { cursor: pointer; transition: all 0.2s; border: 3px solid #f0e6cc; border-radius: 20px; background: white; }
+        .goal-item.checked { background-color: var(--mint-green) !important; border-color: #7ed97e; color: #2d5a2d; }
+        .map-container { display: grid; grid-template-columns: repeat(auto-fill, minmax(70px, 1fr)); gap: 12px; padding: 25px; }
+        .tile { aspect-ratio: 1; border-radius: 22px; display: flex; align-items: center; justify-content: center; font-weight: 900; cursor: pointer; transition: all 0.2s; background: #fff; border: 3px solid #f0e6cc; box-shadow: 0 4px 0 #e5d9b6; }
+        .tile.completed { background-color: var(--mint-green) !important; border-color: #7ed97e; box-shadow: 0 4px 0 #6cc76c; color: #2d5a2d; }
+        .nurse-container { position: fixed; bottom: 20px; right: 20px; width: 120px; z-index: 100; cursor: pointer; animation: floating 4s ease-in-out infinite; }
+        @keyframes floating { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-15px); } }
+        .nurse-bubble { position: absolute; top: -60px; right: 0; background: white; padding: 8px 15px; border-radius: 20px; border: 2px solid var(--morandi-pink); font-size: 13px; font-weight: bold; white-space: nowrap; opacity: 0; transition: 0.3s; pointer-events: none; }
+        .nurse-container:hover .nurse-bubble { opacity: 1; }
+        .memo-input { background: #fdf6e3; border: 2px dashed #e5d9b6; border-radius: 15px; width: 100%; padding: 12px; font-size: 14px; color: var(--ac-brown); resize: none; }
+        .btn-restore { background: #8B5E3C; color: white; padding: 8px 20px; border-radius: 25px; font-weight: 900; cursor: pointer; transition: 0.3s; }
+        .btn-restore:hover { background: #5d3f28; transform: scale(1.05); }
+    </style>
+</head>
+<body class="p-4 md:p-8">
+
+
+    <div class="max-w-5xl mx-auto">
+        <header class="ac-card p-8 mb-8 text-center md:text-left">
+            <div class="flex flex-col md:flex-row justify-between items-center gap-6">
+                <div>
+                    <h1 class="text-4xl md:text-5xl font-black mb-2 flex items-center gap-3">
+                        <span class="text-pink-400">護理晉進冒險</span> 🍃
+                    </h1>
+                    <p class="text-sm font-bold opacity-70 mb-4">目標是成為最溫柔又專業的護理師！</p>
+                    <button onclick="restoreFromData()" class="btn-restore">📥 匯入/復原備份資料</button>
+                    <button onclick="exportData()" class="btn-restore ml-2" style="background:#e8a5a5">💾 下載備份(匯出)</button>
+                </div>
+                <div class="bg-[#fdf6e3] px-8 py-4 rounded-[30px] border-2 border-[#e5d9b6]">
+                    <p class="text-xs font-black mb-1 opacity-60">當前階段進度</p>
+                    <p id="total-progress-percent" class="text-4xl font-black text-pink-400">0%</p>
+                </div>
+            </div>
+            <div class="mt-8 w-full h-6 bg-[#f0e6cc] rounded-full p-1 shadow-inner">
+                <div id="progress-bar" class="h-full rounded-full transition-all duration-700" style="width: 0%; background-color: var(--morandi-pink);"></div>
+            </div>
+        </header>
+
+
+        <nav class="flex flex-wrap gap-3 mb-8">
+            <button onclick="switchStage(0)" class="tab-btn active flex-1 py-3" id="btn-n1">N1</button>
+            <button onclick="switchStage(1)" class="tab-btn flex-1 py-3" id="btn-n2">N2</button>
+            <button onclick="switchStage(2)" class="tab-btn flex-1 py-3" id="btn-n3">N3</button>
+            <button onclick="switchStage(3)" class="tab-btn flex-1 py-3" id="btn-n4">N4</button>
+        </nav>
+
+
+        <div class="ac-card p-8 mb-8">
+            <h2 id="stage-title" class="text-2xl font-black mb-6">📋 晉升條件</h2>
+            <div id="goals-list" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4"></div>
+        </div>
+
+
+        <div class="ac-card mb-12">
+            <div id="game-board" class="map-container"></div>
+        </div>
+    </div>
+
+
+    <div class="nurse-container" onclick="alert('今天也要加油喔！💉')">
+        <div class="nurse-bubble">點我看進度匯出！</div>
+        <img src="https://i.ibb.co/xqMkN2ZV/Gemini-Generated-Image-7071157071157071.png" class="w-full mix-blend-multiply">
+    </div>
+
+
+    <div id="overlay" class="fixed inset-0 bg-black/20 backdrop-blur-sm hidden z-40" onclick="closeModal()"></div>
+    <div id="modal" class="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[90%] max-w-sm bg-white rounded-[40px] shadow-2xl hidden z-50 p-8 border-8 border-[#f0e6cc]">
+        <h2 id="modal-week-title" class="text-3xl font-black mb-2"></h2>
+        <p id="modal-task-desc" class="text-gray-500 mb-4 italic"></p>
+        <div class="mb-6">
+            <p class="text-xs font-black text-pink-400 mb-2">📒 臨床絕招 Memo</p>
+            <textarea id="modal-memo" class="memo-input" rows="3" placeholder="這週學到了什麼大招？"></textarea>
+        </div>
+        <button id="complete-btn" onclick="toggleWeekStatus()" class="w-full py-4 rounded-[25px] font-black text-white text-xl shadow-lg transition-transform active:scale-95">標記完成！</button>
+    </div>
+
+
+    <script>
+        // 資料初始化
+        let weekProgress = JSON.parse(localStorage.getItem('nurse_weeks')) || [];
+        let goalProgress = JSON.parse(localStorage.getItem('nurse_goals')) || {};
+        let memoData = JSON.parse(localStorage.getItem('nurse_memos')) || {};
+        let currentStageIndex = 0;
+        let currentEditingWeek = null;
+
+
+        const stageConfig = [
+            { id: 'n1', label: 'N1 萌芽', range: [1, 52], task: "熟悉環境及工作流程，執行一般護理。", goals: ["📖 N1訓練滿15小時", "📄 讀書報告5小時", "✅ 通過讀書報告審查", "🧑‍⚕️ 個別護理指導", "🛠️ 參與設備醫材管理"] },
+            { id: 'n2', label: 'N2 成長', range: [53, 104], task: "照護重症病人，協助指導新進人員。", goals: ["📖 N2訓練滿15小時", "🧪 學術活動滿5小時", "📝 通過案例分析", "🏥 重症病人護理", "🤝 指導新進人員", "📊 參與品管活動"] },
+            { id: 'n3', label: 'N3 繁花', range: [105, 156], task: "主講教育課程，獨立指導新人。", goals: ["📖 N3訓練滿15小時", "🧪 學術活動滿5小時", "📑 通過個案報告", "🎤 主講教育課程", "🔍 獨立指導護生", "🚩 執行品管活動"] },
+            { id: 'n4', label: 'N4 巔峰', range: [157, 208], task: "專科進階護理，擔任組長或主持會議。", goals: ["📖 N4訓練滿15小時", "🧪 學術活動滿5小時", "🏆 通過專案/研究文章", "💎 專科進階護理", "👑 獨立指導護生", "🚩 擔任組長/主持會議"] }
+        ];
+
+
+        function switchStage(index) {
+            currentStageIndex = index;
+            document.querySelectorAll('.tab-btn').forEach((btn, i) => btn.classList.toggle('active', i === index));
+            const stage = stageConfig[index];
+            document.getElementById('stage-title').innerText = `📋 ${stage.label} 晉升條件`;
+            
+            const list = document.getElementById('goals-list');
+            list.innerHTML = stage.goals.map((g, i) => {
+                const id = `${stage.id}_${i}`;
+                return `<div class="goal-item p-4 flex items-center gap-3 ${goalProgress[id] ? 'checked' : ''}" onclick="toggleGoal('${id}')"><span class="text-sm font-black">${g}</span></div>`;
+            }).join('');
+            
+            renderBoard();
+            updateUI();
+        }
+
+
+        function toggleGoal(id) {
+            goalProgress[id] = !goalProgress[id];
+            localStorage.setItem('nurse_goals', JSON.stringify(goalProgress));
+            if(goalProgress[id]) confetti({ particleCount: 30 });
+            switchStage(currentStageIndex);
+        }
+
+
+        function renderBoard() {
+            const board = document.getElementById('game-board');
+            const stage = stageConfig[currentStageIndex];
+            board.innerHTML = '';
+            for (let i = stage.range[0]; i <= stage.range[1]; i++) {
+                const isComp = weekProgress.includes(i);
+                const tile = document.createElement('div');
+                tile.className = `tile ${isComp ? 'completed' : ''}`;
+                tile.innerHTML = isComp ? '🌸' : i;
+                tile.onclick = () => openModal(i);
+                board.appendChild(tile);
+            }
+        }
+
+
+        function openModal(week) {
+            currentEditingWeek = week;
+            const stage = stageConfig.find(s => week >= s.range[0] && week <= s.range[1]);
+            const isComp = weekProgress.includes(week);
+            document.getElementById('modal-week-title').innerText = `第 ${week} 週`;
+            document.getElementById('modal-task-desc').innerText = stage.task;
+            document.getElementById('modal-memo').value = memoData[week] || "";
+            const btn = document.getElementById('complete-btn');
+            btn.innerText = isComp ? '取消紀錄' : '這週達成了！';
+            btn.style.backgroundColor = isComp ? '#ccc' : 'var(--morandi-pink)';
+            document.getElementById('overlay').classList.remove('hidden');
+            document.getElementById('modal').classList.remove('hidden');
+        }
+
+
+        function toggleWeekStatus() {
+            const memo = document.getElementById('modal-memo').value;
+            if(memo) memoData[currentEditingWeek] = memo;
+            else delete memoData[currentEditingWeek];
+            localStorage.setItem('nurse_memos', JSON.stringify(memoData));
+
+
+            if (weekProgress.includes(currentEditingWeek)) {
+                weekProgress = weekProgress.filter(w => w !== currentEditingWeek);
+            } else {
+                weekProgress.push(currentEditingWeek);
+                confetti({ particleCount: 80, spread: 60 });
+            }
+            localStorage.setItem('nurse_weeks', JSON.stringify(weekProgress));
+            closeModal();
+            switchStage(currentStageIndex);
+        }
+
+
+        function updateUI() {
+            const stage = stageConfig[currentStageIndex];
+            const comp = weekProgress.filter(w => w >= stage.range[0] && w <= stage.range[1]).length;
+            const pct = Math.round((comp / 52) * 100);
+            document.getElementById('total-progress-percent').innerText = pct + "%";
+            document.getElementById('progress-bar').style.width = pct + "%";
+        }
+
+
+        function closeModal() {
+            document.getElementById('overlay').classList.add('hidden');
+            document.getElementById('modal').classList.add('hidden');
+        }
+
+
+        // --- 匯入匯出核心：讓妳能在不同手機/電腦同步 ---
+        function exportData() {
+            const allData = {
+                weeks: weekProgress,
+                goals: goalProgress,
+                memos: memoData
+            };
+            const dataStr = JSON.stringify(allData);
+            const blob = new Blob([dataStr], {type: "application/json"});
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `護理冒險備份_${new Date().toLocaleDateString()}.json`;
+            a.click();
+            alert("備份檔已下載！妳可以把它存在 LINE 或雲端，下次匯入就靠它。");
+        }
+
+
+        function restoreFromData() {
+            const input = prompt("請貼上妳備份的 JSON 字串 (如果是用匯出的檔案，請用記事本打開後複製全部內容)：");
+            if (!input) return;
+            try {
+                const data = JSON.parse(input);
+                if (data.weeks) {
+                    weekProgress = data.weeks;
+                    goalProgress = data.goals || {};
+                    memoData = data.memos || {};
+                    localStorage.setItem('nurse_weeks', JSON.stringify(weekProgress));
+                    localStorage.setItem('nurse_goals', JSON.stringify(goalProgress));
+                    localStorage.setItem('nurse_memos', JSON.stringify(memoData));
+                    alert("🏥 數據復原成功！");
+                    location.reload();
+                }
+            } catch (e) {
+                alert("格式不正確，請確認複製的是完整的備份內容喔。");
+            }
+        }
+
+
+        window.onload = () => switchStage(0);
+    </script>
+</body>
+</html>
