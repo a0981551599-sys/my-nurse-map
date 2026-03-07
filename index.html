@@ -29,7 +29,7 @@
         #achievement-overlay { position: fixed; inset: 0; background: rgba(255, 255, 255, 0.9); z-index: 10002; display: none; align-items: center; justify-content: center; flex-direction: column; }
         .medal-card { background: white; border: 10px solid var(--morandi-pink); border-radius: 50%; width: 300px; height: 300px; display: flex; align-items: center; justify-content: center; flex-direction: column; box-shadow: 0 15px 0 #e8a5a5; animation: medal-bounce 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
         @keyframes medal-bounce { 0% { transform: scale(0); } 80% { transform: scale(1.1); } 100% { transform: scale(1); } }
-        .memo-input { background: #fdf6e3; border: 2px dashed #e5d9b6; border-radius: 15px; width: 100%; padding: 12px; font-size: 14px; color: var(--ac-brown); resize: none; outline: none; }
+        .memo-input { background: #fdf6e3; border: 2px dashed #e5d9b6; border-radius: 15px; width: 100%; padding: 10px; font-size: 14px; color: var(--ac-brown); resize: none; outline: none; }
         .btn-system-icon { background: #8B5E3C; color: white; width: 36px; height: 36px; border-radius: 50%; font-size: 18px; display: inline-flex; align-items: center; justify-content: center; cursor: pointer; transition: 0.3s; box-shadow: 0 3px 0 #5d3f28; }
         .btn-system-icon:hover { transform: translateY(-2px); box-shadow: 0 5px 0 #5d3f28; }
         .btn-system-icon:active { transform: translateY(1px); box-shadow: 0 1px 0 #5d3f28; }
@@ -93,10 +93,22 @@
     <div id="modal" class="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[90%] max-w-sm bg-white rounded-[40px] shadow-2xl hidden z-50 p-8 border-8 border-[#f0e6cc]">
         <h2 id="modal-week-title" class="text-4xl font-black text-gray-800 mb-2"></h2>
         <p id="modal-task-desc" class="text-gray-500 mb-4 italic"></p>
-        <div class="mb-6">
-            <p class="text-xs font-black text-pink-400 mb-2">📒 臨床絕招 Memo</p>
-            <textarea id="modal-memo" class="memo-input" rows="3"></textarea>
+        
+        <div class="space-y-4 mb-6">
+            <div>
+                <p class="text-[10px] font-black text-pink-400 mb-1">本週已教</p>
+                <textarea id="memo-taught" class="memo-input" rows="1" placeholder="輸入內容..."></textarea>
+            </div>
+            <div>
+                <p class="text-[10px] font-black text-blue-400 mb-1">上課積分</p>
+                <textarea id="memo-score" class="memo-input" rows="1" placeholder="輸入分數/內容..."></textarea>
+            </div>
+            <div>
+                <p class="text-[10px] font-black text-green-500 mb-1">改進</p>
+                <textarea id="memo-improve" class="memo-input" rows="2" placeholder="輸入需要調整的地方..."></textarea>
+            </div>
         </div>
+
         <button id="complete-btn" onclick="toggleWeekStatus(); playSound('success')" class="w-full py-4 rounded-[25px] font-black text-white text-xl shadow-lg">標記完成！</button>
     </div>
 
@@ -204,7 +216,7 @@
                 tile.innerHTML = isComp ? '🌸' : i;
                 tile.onclick = (e) => { 
                     e.stopPropagation(); 
-                    playSound('pop'); // 日期按鈕點擊聲音
+                    playSound('pop');
                     openModal(i); 
                 };
                 board.appendChild(tile);
@@ -217,7 +229,22 @@
             const isComp = weekProgress.includes(week);
             document.getElementById('modal-week-title').innerText = `第 ${week} 週`;
             document.getElementById('modal-task-desc').innerText = stage.task;
-            document.getElementById('modal-memo').value = memoData[week] || "";
+            
+            // 解析資料（相容舊有的純文字儲存）
+            const existingData = memoData[week];
+            let taught = "", score = "", improve = "";
+            if (existingData && typeof existingData === 'object') {
+                taught = existingData.taught || "";
+                score = existingData.score || "";
+                improve = existingData.improve || "";
+            } else if (existingData) {
+                improve = existingData; // 舊資料存入改進區
+            }
+
+            document.getElementById('memo-taught').value = taught;
+            document.getElementById('memo-score').value = score;
+            document.getElementById('memo-improve').value = improve;
+
             const btn = document.getElementById('complete-btn');
             btn.innerText = isComp ? '取消紀錄' : '標記完成！';
             btn.style.backgroundColor = isComp ? '#ccc' : 'var(--morandi-pink)';
@@ -226,13 +253,24 @@
         }
 
         function toggleWeekStatus() {
-            const memo = document.getElementById('modal-memo').value;
-            if (memo) memoData[currentEditingWeek] = memo;
-            else delete memoData[currentEditingWeek];
+            const taught = document.getElementById('memo-taught').value.trim();
+            const score = document.getElementById('memo-score').value.trim();
+            const improve = document.getElementById('memo-improve').value.trim();
+
+            if (taught || score || improve) {
+                memoData[currentEditingWeek] = { taught, score, improve };
+            } else {
+                delete memoData[currentEditingWeek];
+            }
+            
             localStorage.setItem('ac_nursing_memos', JSON.stringify(memoData));
 
-            if (weekProgress.includes(currentEditingWeek)) weekProgress = weekProgress.filter(w => w !== currentEditingWeek);
-            else { weekProgress.push(currentEditingWeek); confetti({ particleCount: 80 }); }
+            if (weekProgress.includes(currentEditingWeek)) {
+                weekProgress = weekProgress.filter(w => w !== currentEditingWeek);
+            } else { 
+                weekProgress.push(currentEditingWeek); 
+                confetti({ particleCount: 80 }); 
+            }
             localStorage.setItem('ac_nursing_weeks', JSON.stringify(weekProgress));
 
             closeModal(); renderBoard(); updateGlobalUI();
@@ -256,7 +294,6 @@
             setTimeout(() => bubble.classList.remove('show'), 3000);
         }
 
-        // --- GitHub 專屬備份功能 ---
         function exportData() {
             const allData = { weeks: weekProgress, goals: goalProgress, memos: memoData };
             const dataStr = JSON.stringify(allData);
